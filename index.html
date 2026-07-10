@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        html {
+            background-color: white;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .no-copy {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<button id="modeBtn" onclick="toggleDarkMode()" style="padding: 8px 15px; font-weight: bold; cursor: pointer; margin-bottom: 15px;">Switch to Dark Mode</button>
+<br>
+<div style="margin-bottom: 15px; font-size: 13px; color: #555; max-width: 800px; line-height: 1.4; border: 1px solid #ddd; padding: 10px; background-color: #fafafa; border-radius: 5px;">
+    <em><strong>Note:</strong> This is a personal archive for my unfiltered, random ideas. These are not professional research or expert advice. If an idea falls within my specific areas of expertise, I will explicitly state it. 
+    <br><strong>Language:</strong> Please excuse any errors; I am an Arab speaker and English is not my native language.
+    <br><strong>How to use:</strong> Click any marker to view details below. <strong>Use the mouse wheel over the canvas to zoom in/out.</strong></em>
+</div>
+<canvas id="mapCanvas" width="800" height="480" style="border:1px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.3);"></canvas>
+
+<div style="margin-top: 15px;">
+    <textarea id="details" class="no-copy" readonly 
+              oncopy="return false;" oncut="return false;" onpaste="return false;" oncontextmenu="return false;" 
+              style="width: 780px; min-height: 80px; padding: 10px; font-family: Arial, sans-serif; background-color: #f4f4f4; border: 1px solid #aaa; cursor: default; font-size: 14px; resize: none; overflow-y: hidden;">Click an idea marker on the graph to view its details.</textarea>
+</div>
+
+<script>
+    // --- DARK MODE TOGGLE ---
+    let isDark = false;
+    function toggleDarkMode() {
+        isDark = !isDark;
+        const button = document.getElementById('modeBtn');
+        
+        if (isDark) {
+            document.documentElement.style.filter = "invert(1)";
+            button.innerText = "Switch to Light Mode";
+        } else {
+            document.documentElement.style.filter = "none";
+            button.innerText = "Switch to Dark Mode";
+        }
+    }
+
+    // --- CANVAS & GRAPH ENGINE ---
+    const canvas = document.getElementById('mapCanvas');
+    const ctx = canvas.getContext('2d');
+    const details = document.getElementById('details');
+
+    const margin = { left: 80, right: 20, top: 20, bottom: 60 };
+    const graphW = canvas.width - margin.left - margin.right;
+    const graphH = canvas.height - margin.top - margin.bottom;
+
+const dots = [
+        {
+            id: 1,
+            x: 100,
+            y: 150,
+            shape: 'square',
+            title: "Probability = Ignorance?",
+            desc: "It seems like probability math is just a way to quantify our ignorance or stupidity. Maybe randomness isn't actually real. Maybe probability only exists because we don't know the full state of reality, so we use statistics to fill the gaps. If we knew everything, maybe there would be no probability at all.",
+            connections: [4]
+        },
+        {
+            id: 2,
+            x: 350,
+            y: 300,
+            shape: 'triangle',
+            title: "Green Button Mode",
+            desc: "A personal idea, not from an AI expert or researcher. The idea is that AI systems could have a Green Button Mode focused on reducing environmental impact. Instead of always using maximum computing power, the system could choose a more efficient way to answer while still transferring useful knowledge. The goal is to reduce energy usage, lower resource waste, and create a better balance between technology, users, and the environment.",
+            connections: [] // Required so dot.connections.forEach doesn't crash
+        }
+    ];
+    let scale = 1, offsetX = 0, offsetY = 0;
+    let isDragging = false, lastX, lastY;
+    const markerSize = 12;
+
+	function drawShape(ctx, x, y, shape) {
+		ctx.beginPath();
+		
+		// Define sizes: default is 12, square is reduced to 8
+		const size = (shape === 'square') ? 9 : 12;
+
+		if (shape === 'square') {
+			ctx.rect(x - size/2, y - size/2, size, size);
+		} else if (shape === 'triangle') {
+			ctx.moveTo(x, y - size/2);
+			ctx.lineTo(x + size/2, y + size/2);
+			ctx.lineTo(x - size/2, y + size/2);
+			ctx.closePath();
+		} else if (shape === 'diamond') {
+			ctx.moveTo(x, y - size/2);
+			ctx.lineTo(x + size/2, y);
+			ctx.lineTo(x, y + size/2);
+			ctx.lineTo(x - size/2, y);
+			ctx.closePath();
+		}
+		ctx.fill();
+	}
+
+    function draw() {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(margin.left, margin.top, graphW, graphH);
+        ctx.clip();
+
+        ctx.translate(margin.left + offsetX, margin.top + offsetY);
+        ctx.scale(scale, scale);
+
+        // 1. Connections
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1.5 / scale; 
+        dots.forEach(dot => {
+            dot.connections.forEach(targetId => {
+                const target = dots.find(d => d.id === targetId);
+                if (target) {
+                    ctx.beginPath(); ctx.moveTo(dot.x, dot.y); ctx.lineTo(target.x, target.y); ctx.stroke();
+                }
+            });
+        });
+
+        // 2. Marker Shapes
+        dots.forEach(dot => {
+            ctx.fillStyle = '#333';
+            drawShape(ctx, dot.x, dot.y, dot.shape);
+        });
+
+        // 3. Labels (Drawn last so they stay on top)
+        // FIX: Explicitly set text alignment so the Y-axis alignment doesn't leak over
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        dots.forEach(dot => {
+            ctx.fillStyle = '#000';
+            ctx.font = "bold 12px Arial";
+            ctx.fillText(dot.title, dot.x + 12, dot.y);
+        });
+
+        ctx.restore(); 
+
+        // Rulers and Axes Overlays
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, margin.left, canvas.height); 
+        ctx.fillRect(0, margin.top + graphH, canvas.width, margin.bottom); 
+
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, margin.top); ctx.lineTo(margin.left, margin.top + graphH);
+        ctx.moveTo(margin.left, margin.top + graphH); ctx.lineTo(margin.left + graphW, margin.top + graphH);
+        ctx.stroke();
+
+        ctx.fillStyle = '#000';
+        ctx.font = "bold 14px Arial";
+        ctx.textAlign = 'center';
+        ctx.fillText("Coordinate X (Ideas Map)", margin.left + graphW/2, canvas.height - 10);
+        
+        ctx.save();
+        ctx.translate(20, margin.top + graphH/2); ctx.rotate(-Math.PI / 2);
+        ctx.fillText("Coordinate Y", 0, 0);
+        ctx.restore();
+
+        ctx.font = "12px Arial";
+        ctx.lineWidth = 1;
+
+        // X Ticks
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        const xStep = 100;
+        let startX = Math.floor(-offsetX / scale / xStep) * xStep;
+        let endX = startX + (graphW / scale) + xStep;
+        for (let x = startX; x <= endX; x += xStep) {
+            let screenX = margin.left + (x * scale) + offsetX;
+            if (screenX >= margin.left && screenX <= margin.left + graphW) {
+                ctx.beginPath(); ctx.moveTo(screenX, margin.top + graphH); ctx.lineTo(screenX, margin.top + graphH + 5); ctx.stroke();
+                ctx.fillText(x, screenX, margin.top + graphH + 8);
+            }
+        }
+
+        // Y Ticks
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        const yStep = 100;
+        let startY = Math.floor(-offsetY / scale / yStep) * yStep;
+        let endY = startY + (graphH / scale) + yStep;
+        for (let y = startY; y <= endY; y += yStep) {
+            let screenY = margin.top + (y * scale) + offsetY;
+            if (screenY >= margin.top && screenY <= margin.top + graphH) {
+                ctx.beginPath(); ctx.moveTo(margin.left, screenY); ctx.lineTo(margin.left - 5, screenY); ctx.stroke();
+                ctx.fillText(y, margin.left - 8, screenY);
+            }
+        }
+    }
+
+    function getHoveredDot(screenX, screenY) {
+        const dataX = (screenX - margin.left - offsetX) / scale;
+        const dataY = (screenY - margin.top - offsetY) / scale;
+        return dots.find(d => Math.hypot(d.x - dataX, d.y - dataY) <= markerSize);
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        if (mx > margin.left && my < margin.top + graphH) {
+            const isOverDot = getHoveredDot(mx, my);
+            canvas.style.cursor = isOverDot ? 'pointer' : (isDragging ? 'grabbing' : 'crosshair');
+            if (isDragging) { offsetX += mx - lastX; offsetY += my - lastY; }
+        } else { canvas.style.cursor = 'default'; }
+
+        lastX = mx; lastY = my;
+        draw();
+    });
+
+    canvas.addEventListener('mousedown', (e) => { 
+        const rect = canvas.getBoundingClientRect();
+        if (e.clientX - rect.left > margin.left && e.clientY - rect.top < margin.top + graphH) {
+            isDragging = true; canvas.style.cursor = 'grabbing';
+        }
+    });
+    
+    window.addEventListener('mouseup', () => { isDragging = false; });
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        if (e.clientX - rect.left > margin.left && e.clientY - rect.top < margin.top + graphH) {
+            scale = Math.min(Math.max(0.3, scale + (e.deltaY * -0.001)), 4);
+            draw();
+        }
+    });
+
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        
+        if (mx > margin.left && my < margin.top + graphH) {
+            const clickedDot = getHoveredDot(mx, my);
+            if (clickedDot) {
+                details.value = `ID: ${clickedDot.id} | Coordinates: (X: ${clickedDot.x}, Y: ${clickedDot.y})\nTitle: ${clickedDot.title}\n\nDescription:\n${clickedDot.desc}`;
+                details.style.height = 'auto';
+                details.style.height = details.scrollHeight + 'px';
+            }
+        }
+    });
+
+    draw();
+</script>
+</body>
+</html>
